@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
+   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#09111f" />
   <meta name="description" content="World Rating Index — a private, personal atlas for rating every country." />
@@ -204,7 +204,7 @@ button { cursor: pointer; }
             <div class="panel-empty"><span class="detail-cross">+</span><p class="eyebrow">RATING PANEL</p><h3>Choose a country<br />to begin.</h3><p>Every rating is private to this browser and can be backed up at any time.</p></div>
           </aside>
         </div>
-        <div class="privacy-strip"><div><span class="privacy-icon">◉</span><strong>Private by default.</strong> Your ratings are saved locally in this browser.</div><button class="text-btn danger-text" id="resetAllBtn" type="button">Reset all ratings <span>×</span></button></div>
+        <div class="privacy-strip"><div><span class="privacy-icon">◉</span><strong>Private by default.</strong> Your ratings are synced securely to Supabase.</div><button class="text-btn danger-text" id="resetAllBtn" type="button">Reset all ratings <span>×</span></button></div>
       </section>
     </main>
 
@@ -213,22 +213,107 @@ button { cursor: pointer; }
   <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-icon">✓</span><span id="toastMessage">Saved</span></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
 /* World Rating Index — client-side application. External data: REST Countries + public GeoJSON boundaries. */
-const STORAGE_KEY = 'world-rating-index:v1';
+const SUPABASE_URL = 'https://sbpqopuumfqyrozljzfu.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_IfjJZR7OPg_M29sjHuaFjg_XG13pVeJ';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+const STORAGE_KEY = 'world-rating-index:legacy';
 const THEME_KEY = 'world-rating-index:theme';
 const CONTINENTS = ['Africa', 'Asia', 'Europe', 'North America', 'South America', 'Oceania'];
 const FALLBACK_COUNTRIES = [
   ['AFG','Afghanistan','Asia','🇦🇫'],['ALB','Albania','Europe','🇦🇱'],['DZA','Algeria','Africa','🇩🇿'],['AND','Andorra','Europe','🇦🇩'],['AGO','Angola','Africa','🇦🇴'],['ATG','Antigua and Barbuda','North America','🇦🇬'],['ARG','Argentina','South America','🇦🇷'],['ARM','Armenia','Asia','🇦🇲'],['AUS','Australia','Oceania','🇦🇺'],['AUT','Austria','Europe','🇦🇹'],['AZE','Azerbaijan','Asia','🇦🇿'],['BHS','Bahamas','North America','🇧🇸'],['BHR','Bahrain','Asia','🇧🇭'],['BGD','Bangladesh','Asia','🇧🇩'],['BRB','Barbados','North America','🇧🇧'],['BLR','Belarus','Europe','🇧🇾'],['BEL','Belgium','Europe','🇧🇪'],['BLZ','Belize','North America','🇧🇿'],['BEN','Benin','Africa','🇧🇯'],['BTN','Bhutan','Asia','🇧🇹'],['BOL','Bolivia','South America','🇧🇴'],['BIH','Bosnia and Herzegovina','Europe','🇧🇦'],['BWA','Botswana','Africa','🇧🇼'],['BRA','Brazil','South America','🇧🇷'],['BRN','Brunei','Asia','🇧🇳'],['BGR','Bulgaria','Europe','🇧🇬'],['BFA','Burkina Faso','Africa','🇧🇫'],['BDI','Burundi','Africa','🇧🇮'],['CPV','Cabo Verde','Africa','🇨🇻'],['KHM','Cambodia','Asia','🇰🇭'],['CMR','Cameroon','Africa','🇨🇲'],['CAN','Canada','North America','🇨🇦'],['CAF','Central African Republic','Africa','🇨🇫'],['TCD','Chad','Africa','🇹🇩'],['CHL','Chile','South America','🇨🇱'],['CHN','China','Asia','🇨🇳'],['COL','Colombia','South America','🇨🇴'],['COM','Comoros','Africa','🇰🇲'],['COG','Republic of the Congo','Africa','🇨🇬'],['COD','Democratic Republic of the Congo','Africa','🇨🇩'],['CRI','Costa Rica','North America','🇨🇷'],['CIV','Côte d’Ivoire','Africa','🇨🇮'],['HRV','Croatia','Europe','🇭🇷'],['CUB','Cuba','North America','🇨🇺'],['CYP','Cyprus','Europe','🇨🇾'],['CZE','Czechia','Europe','🇨🇿'],['DNK','Denmark','Europe','🇩🇰'],['DJI','Djibouti','Africa','🇩🇯'],['DMA','Dominica','North America','🇩🇲'],['DOM','Dominican Republic','North America','🇩🇴'],['ECU','Ecuador','South America','🇪🇨'],['EGY','Egypt','Africa','🇪🇬'],['SLV','El Salvador','North America','🇸🇻'],['GNQ','Equatorial Guinea','Africa','🇬🇶'],['ERI','Eritrea','Africa','🇪🇷'],['EST','Estonia','Europe','🇪🇪'],['SWZ','Eswatini','Africa','🇸🇿'],['ETH','Ethiopia','Africa','🇪🇹'],['FJI','Fiji','Oceania','🇫🇯'],['FIN','Finland','Europe','🇫🇮'],['FRA','France','Europe','🇫🇷'],['GAB','Gabon','Africa','🇬🇦'],['GMB','Gambia','Africa','🇬🇲'],['GEO','Georgia','Asia','🇬🇪'],['DEU','Germany','Europe','🇩🇪'],['GHA','Ghana','Africa','🇬🇭'],['GRC','Greece','Europe','🇬🇷'],['GRD','Grenada','North America','🇬🇩'],['GTM','Guatemala','North America','🇬🇹'],['GIN','Guinea','Africa','🇬🇳'],['GNB','Guinea-Bissau','Africa','🇬🇼'],['GUY','Guyana','South America','🇬🇾'],['HTI','Haiti','North America','🇭🇹'],['HND','Honduras','North America','🇭🇳'],['HUN','Hungary','Europe','🇭🇺'],['ISL','Iceland','Europe','🇮🇸'],['IND','India','Asia','🇮🇳'],['IDN','Indonesia','Asia','🇮🇩'],['IRN','Iran','Asia','🇮🇷'],['IRQ','Iraq','Asia','🇮🇶'],['IRL','Ireland','Europe','🇮🇪'],['ISR','Israel','Asia','🇮🇱'],['ITA','Italy','Europe','🇮🇹'],['JAM','Jamaica','North America','🇯🇲'],['JPN','Japan','Asia','🇯🇵'],['JOR','Jordan','Asia','🇯🇴'],['KAZ','Kazakhstan','Asia','🇰🇿'],['KEN','Kenya','Africa','🇰🇪'],['KIR','Kiribati','Oceania','🇰🇮'],['PRK','North Korea','Asia','🇰🇵'],['KOR','South Korea','Asia','🇰🇷'],['KWT','Kuwait','Asia','🇰🇼'],['KGZ','Kyrgyzstan','Asia','🇰🇬'],['LAO','Laos','Asia','🇱🇦'],['LVA','Latvia','Europe','🇱🇻'],['LBN','Lebanon','Asia','🇱🇧'],['LSO','Lesotho','Africa','🇱🇸'],['LBR','Liberia','Africa','🇱🇷'],['LBY','Libya','Africa','🇱🇾'],['LIE','Liechtenstein','Europe','🇱🇮'],['LTU','Lithuania','Europe','🇱🇹'],['LUX','Luxembourg','Europe','🇱🇺'],['MDG','Madagascar','Africa','🇲🇬'],['MWI','Malawi','Africa','🇲🇼'],['MYS','Malaysia','Asia','🇲🇾'],['MDV','Maldives','Asia','🇲🇻'],['MLI','Mali','Africa','🇲🇱'],['MLT','Malta','Europe','🇲🇹'],['MHL','Marshall Islands','Oceania','🇲🇭'],['MRT','Mauritania','Africa','🇲🇷'],['MUS','Mauritius','Africa','🇲🇺'],['MEX','Mexico','North America','🇲🇽'],['FSM','Micronesia','Oceania','🇫🇲'],['MDA','Moldova','Europe','🇲🇩'],['MCO','Monaco','Europe','🇲🇨'],['MNG','Mongolia','Asia','🇲🇳'],['MNE','Montenegro','Europe','🇲🇪'],['MAR','Morocco','Africa','🇲🇦'],['MOZ','Mozambique','Africa','🇲🇿'],['MMR','Myanmar','Asia','🇲🇲'],['NAM','Namibia','Africa','🇳🇦'],['NRU','Nauru','Oceania','🇳🇷'],['NPL','Nepal','Asia','🇳🇵'],['NLD','Netherlands','Europe','🇳🇱'],['NZL','New Zealand','Oceania','🇳🇿'],['NIC','Nicaragua','North America','🇳🇮'],['NER','Niger','Africa','🇳🇪'],['NGA','Nigeria','Africa','🇳🇬'],['MKD','North Macedonia','Europe','🇲🇰'],['NOR','Norway','Europe','🇳🇴'],['OMN','Oman','Asia','🇴🇲'],['PAK','Pakistan','Asia','🇵🇰'],['PLW','Palau','Oceania','🇵🇼'],['PAN','Panama','North America','🇵🇦'],['PNG','Papua New Guinea','Oceania','🇵🇬'],['PRY','Paraguay','South America','🇵🇾'],['PER','Peru','South America','🇵🇪'],['PHL','Philippines','Asia','🇵🇭'],['POL','Poland','Europe','🇵🇱'],['PRT','Portugal','Europe','🇵🇹'],['QAT','Qatar','Asia','🇶🇦'],['ROU','Romania','Europe','🇷🇴'],['RUS','Russia','Europe','🇷🇺'],['RWA','Rwanda','Africa','🇷🇼'],['KNA','Saint Kitts and Nevis','North America','🇰🇳'],['LCA','Saint Lucia','North America','🇱🇨'],['VCT','Saint Vincent and the Grenadines','North America','🇻🇨'],['WSM','Samoa','Oceania','🇼🇸'],['SMR','San Marino','Europe','🇸🇲'],['STP','São Tomé and Príncipe','Africa','🇸🇹'],['SAU','Saudi Arabia','Asia','🇸🇦'],['SEN','Senegal','Africa','🇸🇳'],['SRB','Serbia','Europe','🇷🇸'],['SYC','Seychelles','Africa','🇸🇨'],['SLE','Sierra Leone','Africa','🇸🇱'],['SGP','Singapore','Asia','🇸🇬'],['SVK','Slovakia','Europe','🇸🇰'],['SVN','Slovenia','Europe','🇸🇮'],['SLB','Solomon Islands','Oceania','🇸🇧'],['SOM','Somalia','Africa','🇸🇴'],['ZAF','South Africa','Africa','🇿🇦'],['SSD','South Sudan','Africa','🇸🇸'],['ESP','Spain','Europe','🇪🇸'],['LKA','Sri Lanka','Asia','🇱🇰'],['SDN','Sudan','Africa','🇸🇩'],['SUR','Suriname','South America','🇸🇷'],['SWE','Sweden','Europe','🇸🇪'],['CHE','Switzerland','Europe','🇨🇭'],['SYR','Syria','Asia','🇸🇾'],['TWN','Taiwan','Asia','🇹🇼'],['TJK','Tajikistan','Asia','🇹🇯'],['TZA','Tanzania','Africa','🇹🇿'],['THA','Thailand','Asia','🇹🇭'],['TLS','Timor-Leste','Asia','🇹🇱'],['TGO','Togo','Africa','🇹🇬'],['TON','Tonga','Oceania','🇹🇴'],['TTO','Trinidad and Tobago','North America','🇹🇹'],['TUN','Tunisia','Africa','🇹🇳'],['TUR','Türkiye','Asia','🇹🇷'],['TKM','Turkmenistan','Asia','🇹🇲'],['TUV','Tuvalu','Oceania','🇹🇻'],['UGA','Uganda','Africa','🇺🇬'],['UKR','Ukraine','Europe','🇺🇦'],['ARE','United Arab Emirates','Asia','🇦🇪'],['GBR','United Kingdom','Europe','🇬🇧'],['USA','United States','North America','🇺🇸'],['URY','Uruguay','South America','🇺🇾'],['UZB','Uzbekistan','Asia','🇺🇿'],['VUT','Vanuatu','Oceania','🇻🇺'],['VAT','Vatican City','Europe','🇻🇦'],['VEN','Venezuela','South America','🇻🇪'],['VNM','Vietnam','Asia','🇻🇳'],['YEM','Yemen','Asia','🇾🇪'],['ZMB','Zambia','Africa','🇿🇲'],['ZWE','Zimbabwe','Africa','🇿🇼']
 ].map(([iso, name, continent, emoji]) => ({ iso, name, continent, emoji, flag: `https://flagcdn.com/w80/${iso.slice(0,2).toLowerCase()}.png` }));
 
-const state = { countries: [], ratings: loadRatings(), selectedIso: null, map: null, geoLayer: null, geoFeatures: [], mapIndex: new Map(), toastTimer: null };
+const state = { countries: [], ratings: {}, userId: null, selectedIso: null, map: null, geoLayer: null, geoFeatures: [], mapIndex: new Map(), toastTimer: null };
 const $ = (id) => document.getElementById(id);
 const normalize = (value = '') => value.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
 const clampScore = (value) => Math.min(10, Math.max(1, Number(value) || 1));
 const roundOne = (value) => Math.round(value * 10) / 10;
-function loadRatings() { try { const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); return stored && typeof stored === 'object' ? stored : {}; } catch { return {}; } }
-function saveRatings() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.ratings)); $('lastSaved').textContent = state.ratings && Object.keys(state.ratings).length ? `SAVED ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'NO SAVED SIGNALS'; }
+function readLegacyRatings() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    return stored && typeof stored === 'object' ? stored : {};
+  } catch {
+    return {};
+  }
+}
+function setStorageStatus(label, isError = false) {
+  const status = $('storageStatus');
+  if (status) {
+    status.innerHTML = `<i></i> ${label}`;
+    status.style.color = isError ? 'var(--coral)' : '';
+  }
+}
+async function getSupabaseUser() {
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  if (sessionData?.session?.user) return sessionData.session.user;
+  const { data, error } = await supabaseClient.auth.signInAnonymously();
+  if (error) throw error;
+  return data.user;
+}
+function rowsToRatings(rows) {
+  return Object.fromEntries(rows.map((row) => [row.country_code, { political: row.political, living: row.living, people: row.people }]));
+}
+async function loadRatings() {
+  try {
+    const user = await getSupabaseUser();
+    state.userId = user.id;
+    const { data, error } = await supabaseClient.from('country_ratings').select('country_code,political,living,people').eq('user_id', user.id);
+    if (error) throw error;
+    const remoteRatings = rowsToRatings(data || []);
+    const legacyRatings = readLegacyRatings();
+    if (!Object.keys(remoteRatings).length && Object.keys(legacyRatings).length) {
+      state.ratings = legacyRatings;
+      await syncAllRatings();
+      localStorage.removeItem(STORAGE_KEY);
+      showToast('Local ratings migrated to Supabase', '↗');
+    } else {
+      state.ratings = remoteRatings;
+      if (Object.keys(legacyRatings).length) localStorage.removeItem(STORAGE_KEY);
+    }
+    setStorageStatus('Synced to Supabase');
+    if (state.countries.length) { renderDirectory(); renderAll(); }
+  } catch (error) {
+    console.error('Supabase rating load failed:', error);
+    state.ratings = readLegacyRatings();
+    setStorageStatus('Cloud sync unavailable', true);
+    if (state.countries.length) { renderDirectory(); renderAll(); }
+    showToast('Cloud sync unavailable; local backup loaded', '!');
+  }
+}
+async function syncAllRatings() {
+  const user = state.userId ? { id: state.userId } : await getSupabaseUser();
+  state.userId = user.id;
+  const { error: deleteError } = await supabaseClient.from('country_ratings').delete().eq('user_id', user.id);
+  if (deleteError) throw deleteError;
+  const rows = Object.entries(state.ratings).map(([country_code, rating]) => ({ user_id: user.id, country_code, political: rating.political, living: rating.living, people: rating.people }));
+  if (rows.length) {
+    const { error } = await supabaseClient.from('country_ratings').upsert(rows, { onConflict: 'user_id,country_code' });
+    if (error) throw error;
+  }
+  setStorageStatus('Synced to Supabase');
+}
+async function saveRating(countryCode, rating) {
+  const user = state.userId ? { id: state.userId } : await getSupabaseUser();
+  state.userId = user.id;
+  const { error } = await supabaseClient.from('country_ratings').upsert({ user_id: user.id, country_code: countryCode, political: rating.political, living: rating.living, people: rating.people }, { onConflict: 'user_id,country_code' });
+  if (error) throw error;
+  setStorageStatus('Synced to Supabase');
+}
+async function deleteRating(countryCode) {
+  if (!state.userId) return;
+  const { error } = await supabaseClient.from('country_ratings').delete().eq('user_id', state.userId).eq('country_code', countryCode);
+  if (error) throw error;
+  setStorageStatus('Synced to Supabase');
+}
+async function deleteAllRatings() {
+  if (!state.userId) return;
+  const { error } = await supabaseClient.from('country_ratings').delete().eq('user_id', state.userId);
+  if (error) throw error;
+  setStorageStatus('Synced to Supabase');
+}
 function ratedScore(rating) { return rating ? roundOne((rating.political + rating.living + rating.people) / 6) : null; }
 function categoryFor(score) { if (score == null) return null; if (score >= 4.5) return 'Absolutely Amazing'; if (score >= 4.0) return 'Very Amazing'; if (score >= 3.5) return 'Amazing'; if (score >= 3.0) return 'Moderate'; if (score >= 2.5) return 'Terrible'; if (score >= 2.0) return 'Very Terrible'; return 'Awful'; }
 function categoryClass(category) { return category ? category.toLowerCase().replace(/\s+/g, '-') : 'unrated'; }
@@ -280,13 +365,13 @@ function renderAll() { renderHero(); renderRankings(); renderContinents(); refre
 function renderDirectory() { const search = normalize($('searchInput').value); const continent = $('continentFilter').value; const category = $('categoryFilter').value; const sort = $('sortSelect').value; let results = state.countries.filter((country) => { const rating = ratingFor(country.iso); const score = ratedScore(rating); const matchesSearch = !search || normalize(country.name).includes(search); const matchesContinent = continent === 'all' || country.continent === continent; const matchesCategory = category === 'all' || category === 'rated' && !!rating || category === 'unrated' && !rating || category === categoryFor(score); return matchesSearch && matchesContinent && matchesCategory; }); results.sort((a, b) => { const ra = ratingFor(a.iso), rb = ratingFor(b.iso); if (sort === 'name') return a.name.localeCompare(b.name); if (sort === 'overall-desc') return (ratedScore(rb) == null ? -1 : ratedScore(rb)) - (ratedScore(ra) == null ? -1 : ratedScore(ra)) || a.name.localeCompare(b.name); if (sort === 'overall-asc') return (ratedScore(ra) == null ? 99 : ratedScore(ra)) - (ratedScore(rb) == null ? 99 : ratedScore(rb)) || a.name.localeCompare(b.name); const metric = sort.replace('-desc', ''); return (rb?.[metric] || -1) - (ra?.[metric] || -1) || a.name.localeCompare(b.name); }); $('directoryCount').textContent = `${results.length} of ${state.countries.length} countries`; $('countryList').innerHTML = results.length ? results.map(countryRow).join('') : '<div class="list-empty">No countries match this readout.</div>'; document.querySelectorAll('.country-row').forEach((row) => { row.addEventListener('click', () => selectCountry(row.dataset.iso)); row.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCountry(row.dataset.iso); } }); }); }
 function countryRow(country) { const rating = ratingFor(country.iso); const score = ratedScore(rating); const category = categoryFor(score); return `<div class="country-row ${state.selectedIso === country.iso ? 'selected' : ''}" data-iso="${country.iso}" role="option" tabindex="0" aria-selected="${state.selectedIso === country.iso}"><img class="country-flag" src="${flagFor(country)}" alt="" loading="lazy" /><div><strong>${country.name}</strong><small>${country.continent} · ${country.iso}</small></div><div class="row-signal ${rating ? '' : 'unrated'}"><b>${score == null ? 'Unrated' : score.toFixed(1)}</b>${rating ? 'out of 5' : 'Awaiting read'}</div><div class="row-category"><span class="status-badge ${categoryClass(category)}">${category || 'Unrated'}</span></div></div>`; }
 function selectCountry(iso, scroll = false) { const country = recordFor(iso); if (!country) return; state.selectedIso = iso; renderRatingPanel(country); renderMapDetail(iso); renderDirectory(); const layer = state.mapIndex.get(iso); if (layer && state.map) { state.map.fitBounds(layer.getBounds(), { padding: [35, 35], maxZoom: 4 }); layer.openTooltip(); } if (scroll) $('directory').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-function renderRatingPanel(country) { const current = ratingFor(country.iso) || { political: 5, living: 5, people: 5 }; $('ratingPanel').innerHTML = `<form class="rating-form" id="ratingForm"><div class="panel-country"><img src="${flagFor(country)}" alt="Flag of ${country.name}" /><div><strong>${country.name}</strong><small>${country.continent} · ${country.iso}</small></div></div><div class="panel-score"><div><span class="panel-score-label">Your overall signal</span><strong id="panelOverall">${ratedScore(current).toFixed(1)}</strong></div><div class="score-category"><b id="panelCategory">${categoryFor(ratedScore(current))}</b><span>out of 5</span></div></div>${ratingInput('political', 'Political Rating', 'Governance, leadership, political environment', current.political)}${ratingInput('living', 'Living Index', 'Quality of life, safety, economy, infrastructure', current.living)}${ratingInput('people', 'The People', 'Friendliness, culture, social attitudes', current.people)}<div class="panel-save"><button class="primary-btn save-btn" type="submit">Save country signal <span>↗</span></button><button class="text-btn clear-btn" id="clearCountryBtn" type="button">Clear this rating <span>×</span></button></div></form>`; ['political', 'living', 'people'].forEach((key) => $(key).addEventListener('input', updatePanelPreview)); $('ratingForm').addEventListener('submit', (event) => { event.preventDefault(); const rating = { political: clampScore($("political").value), living: clampScore($("living").value), people: clampScore($("people").value) }; state.ratings[country.iso] = rating; saveRatings(); renderDirectory(); renderAll(); showToast(`${country.name} signal saved`); }); $('clearCountryBtn').addEventListener('click', () => { delete state.ratings[country.iso]; saveRatings(); renderDirectory(); renderAll(); renderRatingPanel(country); showToast(`${country.name} reset`, '×'); }); }
+function renderRatingPanel(country) { const current = ratingFor(country.iso) || { political: 5, living: 5, people: 5 }; $('ratingPanel').innerHTML = `<form class="rating-form" id="ratingForm"><div class="panel-country"><img src="${flagFor(country)}" alt="Flag of ${country.name}" /><div><strong>${country.name}</strong><small>${country.continent} · ${country.iso}</small></div></div><div class="panel-score"><div><span class="panel-score-label">Your overall signal</span><strong id="panelOverall">${ratedScore(current).toFixed(1)}</strong></div><div class="score-category"><b id="panelCategory">${categoryFor(ratedScore(current))}</b><span>out of 5</span></div></div>${ratingInput('political', 'Political Rating', 'Governance, leadership, political environment', current.political)}${ratingInput('living', 'Living Index', 'Quality of life, safety, economy, infrastructure', current.living)}${ratingInput('people', 'The People', 'Friendliness, culture, social attitudes', current.people)}<div class="panel-save"><button class="primary-btn save-btn" type="submit">Save country signal <span>↗</span></button><button class="text-btn clear-btn" id="clearCountryBtn" type="button">Clear this rating <span>×</span></button></div></form>`; ['political', 'living', 'people'].forEach((key) => $(key).addEventListener('input', updatePanelPreview)); $('ratingForm').addEventListener('submit', async (event) => { event.preventDefault(); const saveButton = event.submitter; saveButton.disabled = true; const rating = { political: clampScore($("political").value), living: clampScore($("living").value), people: clampScore($("people").value) }; try { await saveRating(country.iso, rating); state.ratings[country.iso] = rating; renderDirectory(); renderAll(); showToast(`${country.name} signal saved to Supabase`); } catch (error) { console.error(error); showToast('Could not save to Supabase', '!'); } finally { saveButton.disabled = false; } }); $('clearCountryBtn').addEventListener('click', async () => { try { await deleteRating(country.iso); delete state.ratings[country.iso]; renderDirectory(); renderAll(); renderRatingPanel(country); showToast(`${country.name} reset`, '×'); } catch (error) { console.error(error); showToast('Could not delete from Supabase', '!'); } }); }
 function ratingInput(key, label, description, value) { return `<div class="rating-field"><div class="rating-field-head"><span><b style="color:var(--white);font-weight:500;display:block;margin-bottom:3px">${label}</b><small style="color:var(--muted-dark);font-size:9px">${description}</small></span><strong class="rating-value" id="${key}Value">${value}</strong></div><input id="${key}" type="range" min="1" max="10" step="1" value="${value}" style="--fill:${value * 10}%" aria-label="${label}" /></div>`; }
 function updatePanelPreview() { const values = { political: clampScore($("political").value), living: clampScore($("living").value), people: clampScore($("people").value) }; Object.entries(values).forEach(([key, value]) => { $(`${key}Value`).textContent = value; $(key).style.setProperty('--fill', `${value * 10}%`); }); const score = ratedScore(values); $('panelOverall').textContent = score.toFixed(1); $('panelCategory').textContent = categoryFor(score); }
 function exportRatings() { const blob = new Blob([JSON.stringify({ app: 'World Rating Index', version: 1, exportedAt: new Date().toISOString(), ratings: state.ratings }, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `world-rating-index-${new Date().toISOString().slice(0, 10)}.json`; anchor.click(); URL.revokeObjectURL(url); showToast('Ratings backup exported', '↗'); }
 function importRatings(file) {
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const payload = JSON.parse(reader.result);
       const incoming = payload && typeof payload === 'object' && !Array.isArray(payload) ? (payload.ratings ?? payload) : null;
@@ -303,7 +388,7 @@ function importRatings(file) {
         valid[iso] = { political: Number(rating.political), living: Number(rating.living), people: Number(rating.people) };
       });
       state.ratings = valid;
-      saveRatings();
+      await syncAllRatings();
       renderDirectory();
       renderAll();
       showToast(`${Object.keys(valid).length} ratings imported${rejected ? ` · ${rejected} skipped` : ''}`, '↙');
@@ -312,8 +397,8 @@ function importRatings(file) {
   reader.readAsText(file);
 }
 function setTheme(theme) { document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark'; $('themeIcon').textContent = theme === 'light' ? '☾' : '☼'; localStorage.setItem(THEME_KEY, theme); if (state.map) setTimeout(() => state.map.invalidateSize(), 50); }
-function wireEvents() { ['searchInput', 'continentFilter', 'categoryFilter', 'sortSelect'].forEach((id) => $(id).addEventListener(id === 'searchInput' ? 'input' : 'change', renderDirectory)); $('themeToggle').addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light')); $('exportBtn').addEventListener('click', exportRatings); $('importBtn').addEventListener('click', () => $('importInput').click()); $('importInput').addEventListener('change', (event) => { if (event.target.files[0]) importRatings(event.target.files[0]); event.target.value = ''; }); $('resetAllBtn').addEventListener('click', () => { if (!Object.keys(state.ratings).length) { showToast('No saved ratings to reset', '!'); return; } if (window.confirm('Clear every saved country rating from this browser?')) { state.ratings = {}; saveRatings(); renderDirectory(); renderAll(); if (state.selectedIso) renderRatingPanel(recordFor(state.selectedIso)); showToast('All ratings reset', '×'); } }); document.addEventListener('keydown', (event) => { if (event.key === '/' && document.activeElement.tagName !== 'INPUT') { event.preventDefault(); $('searchInput').focus(); } }); }
-async function init() { setTheme(localStorage.getItem(THEME_KEY) || 'dark'); wireEvents(); saveRatings(); await Promise.all([loadCountries(), initMap()]); }
+function wireEvents() { ['searchInput', 'continentFilter', 'categoryFilter', 'sortSelect'].forEach((id) => $(id).addEventListener(id === 'searchInput' ? 'input' : 'change', renderDirectory)); $('themeToggle').addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light')); $('exportBtn').addEventListener('click', exportRatings); $('importBtn').addEventListener('click', () => $('importInput').click()); $('importInput').addEventListener('change', (event) => { if (event.target.files[0]) importRatings(event.target.files[0]); event.target.value = ''; }); $('resetAllBtn').addEventListener('click', () => { if (!Object.keys(state.ratings).length) { showToast('No saved ratings to reset', '!'); return; } if (window.confirm('Clear every saved country rating from Supabase?')) { deleteAllRatings().then(() => { state.ratings = {}; renderDirectory(); renderAll(); if (state.selectedIso) renderRatingPanel(recordFor(state.selectedIso)); showToast('All ratings reset', '×'); }).catch((error) => { console.error(error); showToast('Could not reset Supabase ratings', '!'); }); } }); document.addEventListener('keydown', (event) => { if (event.key === '/' && document.activeElement.tagName !== 'INPUT') { event.preventDefault(); $('searchInput').focus(); } }); }
+async function init() { setTheme(localStorage.getItem(THEME_KEY) || 'dark'); wireEvents(); await Promise.all([loadCountries(), initMap(), loadRatings()]); }
 init();
 
   </script>
