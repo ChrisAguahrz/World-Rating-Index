@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
-     <meta charset="utf-8" />
+<meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#09111f" />
+   <meta name="theme-color" content="#09111f" />
   <meta name="description" content="World Rating Index — a private, personal atlas for rating every country." />
   <title>World Rating Index</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -258,61 +258,67 @@ function rowsToRatings(rows) {
 }
 async function loadRatings() {
   try {
-    const user = await getSupabaseUser();
-    state.userId = user.id;
-    const { data, error } = await supabaseClient.from('country_ratings').select('country_code,political,living,people').eq('user_id', user.id);
+    const { data, error } = await supabaseClient.from('country_ratings_shared').select('country_code,political,living,people');
     if (error) throw error;
-    const remoteRatings = rowsToRatings(data || []);
+    let remoteRatings = rowsToRatings(data || []);
+    // One-time carryover: if the new shared table is empty, copy this browser's existing anonymous-user ratings.
+    if (!Object.keys(remoteRatings).length) {
+      try {
+        const user = await getSupabaseUser();
+        const { data: oldRows, error: oldError } = await supabaseClient.from('country_ratings').select('country_code,political,living,people').eq('user_id', user.id);
+        if (!oldError && oldRows?.length) {
+          const legacyRemoteRatings = rowsToRatings(oldRows);
+          await syncAllRatings(legacyRemoteRatings);
+          remoteRatings = legacyRemoteRatings;
+        }
+      } catch (migrationError) {
+        console.warn('Could not migrate this browser’s previous ratings:', migrationError);
+      }
+    }
     const legacyRatings = readLegacyRatings();
     if (!Object.keys(remoteRatings).length && Object.keys(legacyRatings).length) {
-      state.ratings = legacyRatings;
-      await syncAllRatings();
+      await syncAllRatings(legacyRatings);
+      remoteRatings = legacyRatings;
       localStorage.removeItem(STORAGE_KEY);
-      showToast('Local ratings migrated to Supabase', '↗');
-    } else {
-      state.ratings = remoteRatings;
-      if (Object.keys(legacyRatings).length) localStorage.removeItem(STORAGE_KEY);
+      showToast('Local ratings migrated to shared Supabase data', '↗');
+    } else if (Object.keys(remoteRatings).length && Object.keys(legacyRatings).length) {
+      localStorage.removeItem(STORAGE_KEY);
     }
-    setStorageStatus('Synced to Supabase');
+    state.ratings = remoteRatings;
+    setStorageStatus('Shared Supabase data');
     if (state.countries.length) { renderDirectory(); renderAll(); }
   } catch (error) {
     console.error('Supabase rating load failed:', error);
     state.ratings = readLegacyRatings();
     setStorageStatus('Cloud sync unavailable', true);
     if (state.countries.length) { renderDirectory(); renderAll(); }
-    showToast('Cloud sync unavailable; local backup loaded', '!');
+    showToast('Cloud sync unavailable; check shared-table setup', '!');
   }
 }
-async function syncAllRatings() {
-  const user = state.userId ? { id: state.userId } : await getSupabaseUser();
-  state.userId = user.id;
-  const { error: deleteError } = await supabaseClient.from('country_ratings').delete().eq('user_id', user.id);
+async function syncAllRatings(ratings = state.ratings) {
+  const { error: deleteError } = await supabaseClient.from('country_ratings_shared').delete().not('country_code', 'is', null);
   if (deleteError) throw deleteError;
-  const rows = Object.entries(state.ratings).map(([country_code, rating]) => ({ user_id: user.id, country_code, political: rating.political, living: rating.living, people: rating.people }));
+  const rows = Object.entries(ratings).map(([country_code, rating]) => ({ country_code, political: rating.political, living: rating.living, people: rating.people }));
   if (rows.length) {
-    const { error } = await supabaseClient.from('country_ratings').upsert(rows, { onConflict: 'user_id,country_code' });
+    const { error } = await supabaseClient.from('country_ratings_shared').upsert(rows, { onConflict: 'country_code' });
     if (error) throw error;
   }
-  setStorageStatus('Synced to Supabase');
+  setStorageStatus('Shared Supabase data');
 }
 async function saveRating(countryCode, rating) {
-  const user = state.userId ? { id: state.userId } : await getSupabaseUser();
-  state.userId = user.id;
-  const { error } = await supabaseClient.from('country_ratings').upsert({ user_id: user.id, country_code: countryCode, political: rating.political, living: rating.living, people: rating.people }, { onConflict: 'user_id,country_code' });
+  const { error } = await supabaseClient.from('country_ratings_shared').upsert({ country_code: countryCode, political: rating.political, living: rating.living, people: rating.people }, { onConflict: 'country_code' });
   if (error) throw error;
-  setStorageStatus('Synced to Supabase');
+  setStorageStatus('Shared Supabase data');
 }
 async function deleteRating(countryCode) {
-  if (!state.userId) return;
-  const { error } = await supabaseClient.from('country_ratings').delete().eq('user_id', state.userId).eq('country_code', countryCode);
+  const { error } = await supabaseClient.from('country_ratings_shared').delete().eq('country_code', countryCode);
   if (error) throw error;
-  setStorageStatus('Synced to Supabase');
+  setStorageStatus('Shared Supabase data');
 }
 async function deleteAllRatings() {
-  if (!state.userId) return;
-  const { error } = await supabaseClient.from('country_ratings').delete().eq('user_id', state.userId);
+  const { error } = await supabaseClient.from('country_ratings_shared').delete().not('country_code', 'is', null);
   if (error) throw error;
-  setStorageStatus('Synced to Supabase');
+  setStorageStatus('Shared Supabase data');
 }
 function ratedScore(rating) { return rating ? roundOne((rating.political + rating.living + rating.people) / 6) : null; }
 function categoryFor(score) { if (score == null) return null; if (score >= 4.5) return 'Absolutely Amazing'; if (score >= 4.0) return 'Very Amazing'; if (score >= 3.5) return 'Amazing'; if (score >= 3.0) return 'Moderate'; if (score >= 2.5) return 'Terrible'; if (score >= 2.0) return 'Very Terrible'; return 'Awful'; }
